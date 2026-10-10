@@ -33,7 +33,7 @@ uploaded_file = st.file_uploader("Upload Lab Report (PDF or Image)", type=["pdf"
 
 if uploaded_file is not None:
     extracted_text = ""
-
+    
     if uploaded_file.type == "application/pdf":
         with st.status("Reading PDF document..."):
             with fitz.open(stream=uploaded_file.read(), filetype="pdf") as doc:
@@ -60,9 +60,13 @@ if uploaded_file is not None:
                     "1. Discuss your current diet with your primary physician.\n"
                     "2. Plan a follow-up test in 3 months."
                 )
-
+                
                 if target_lang_code != "en":
-                    translated_summary = GoogleTranslator(source='auto', target=target_lang_code).translate(raw_summary)
+                    try:
+                        translated_summary = GoogleTranslator(source='auto', target=target_lang_code).translate(raw_summary)
+                    except Exception:
+                        st.warning("⚠️ Translation rate limit reached. Displaying English version:")
+                        translated_summary = raw_summary
                 else:
                     translated_summary = raw_summary
 
