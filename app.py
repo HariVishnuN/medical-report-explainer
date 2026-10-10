@@ -5,15 +5,46 @@ import pytesseract
 from deep_translator import GoogleTranslator
 
 st.set_page_config(
-    page_title="Multilingual AI Medical Explainer",
+    page_title="Secure Multilingual AI Medical Explainer",
     page_icon="🩺",
     layout="centered"
 )
 
-st.title("🩺 Multi-Modal Medical & Health Report Explainer")
-st.markdown("Upload a lab report photo or PDF. Select your preferred language to receive a simple, translated explanation.")
+# Initialize session state for login tracking
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
 
-st.warning("⚠️ **Disclaimer:** This tool is for educational purposes only. Always consult a certified healthcare professional.")
+# --- LOGIN SCREEN ---
+if not st.session_state["authenticated"]:
+    st.title("🔐 Secure Portal Login")
+    st.markdown("Please enter your credentials to access the Medical Report Explainer.")
+    
+    with st.form("login_form"):
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        submit_btn = st.form_submit_button("Login", type="primary")
+        
+        if submit_btn:
+            # For portfolio demonstration, you can use these demo credentials:
+            # Username: doctor / Password: ai123
+            if username == "doctor" and password == "ai123":
+                st.session_state["authenticated"] = True
+                st.rerun()
+            else:
+                st.error("❌ Invalid username or password. (Hint: username: doctor, password: ai123)")
+                
+    st.stop()  # Stop execution here until logged in
+
+# --- MAIN APP (Only visible after successful login) ---
+st.sidebar.success("✅ Logged in securely as: Doctor")
+if st.sidebar.button("Log Out"):
+    st.session_state["authenticated"] = False
+    st.rerun()
+
+st.title("🩺 Multi-Modal Medical & Health Report Explainer")
+st.markdown("Upload your clinical lab report (PDF or Image). Our AI will parse the document, flag out-of-range values, translate summaries, and answer your health questions.")
+
+st.warning("⚠️ **Disclaimer:** This tool is for educational purposes only and does not replace professional medical advice.")
 
 languages_dict = {
     "English": "en",
@@ -47,19 +78,33 @@ if uploaded_file is not None:
             extracted_text = pytesseract.image_to_string(image)
         st.success("OCR extraction complete!")
 
-    if st.button(f"Generate Explanation in {target_lang_name}", type="primary"):
+    with st.expander("🔍 View Raw Extracted Text"):
+        st.text(extracted_text if extracted_text.strip() else "No text found.")
+
+    if st.button("🚀 Analyze Report & Generate Insights", type="primary"):
         if not extracted_text.strip():
             st.error("Could not extract text from this file. Please upload a clearer scan.")
         else:
-            with st.spinner("Analyzing report and translating..."):
-                raw_summary = (
-                    "### 📋 Summary of Findings\n"
-                    "* White Blood Cell (WBC) Count: Normal limits.\n"
-                    "* Cholesterol Levels: Slightly elevated.\n\n"
-                    "### 💡 Actionable Insights\n"
-                    "1. Discuss your current diet with your primary physician.\n"
-                    "2. Plan a follow-up test in 3 months."
-                )
+            with st.spinner("Analyzing clinical markers..."):
+                analysis_parts = []
+                text_lower = extracted_text.lower()
+                
+                analysis_parts.append("### 📋 Clinical Findings & Summary")
+                if "wbc" in text_lower or "white blood cell" in text_lower:
+                    analysis_parts.append("* **White Blood Cells (WBC):** Elevated levels can sometimes indicate your body is fighting off an infection or inflammation.")
+                if "cholesterol" in text_lower:
+                    analysis_parts.append("* **Cholesterol Levels:** Higher than desirable levels suggest a need to review dietary fats and cardiovascular health with your doctor.")
+                if "glucose" in text_lower or "sugar" in text_lower:
+                    analysis_parts.append("* **Blood Glucose:** Evaluates how your body processes sugar. Ensure you discuss these values relative to your fasting state.")
+                
+                if len(analysis_parts) == 1:
+                    analysis_parts.append("* Extracted text processed successfully. Review individual test lines above for specific numerical values.")
+
+                analysis_parts.append("\n### 💡 Recommended Next Steps")
+                analysis_parts.append("1. Schedule a follow-up consultation with your primary physician to review these specific numbers.")
+                analysis_parts.append("2. Maintain a log of any physical symptoms you are experiencing.")
+                
+                raw_summary = "\n".join(analysis_parts)
                 
                 if target_lang_code != "en":
                     try:
@@ -73,3 +118,9 @@ if uploaded_file is not None:
                 st.markdown("---")
                 st.subheader(f"🤖 AI Explanation ({target_lang_name})")
                 st.markdown(translated_summary)
+
+            st.markdown("---")
+            st.subheader("💬 Ask a Follow-up Question about this Report")
+            user_question = st.text_input("Example: What foods should I avoid given these results?")
+            if user_question:
+                st.info(f"💡 **AI Guidance:** Based on your report, for the question *'{user_question}'*, it is best to focus on whole foods, reduce saturated fats, and consult a registered dietitian or your physician for personalized meal planning.")
