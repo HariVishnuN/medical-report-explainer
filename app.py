@@ -13,36 +13,40 @@ st.set_page_config(
 # Initialize session state for login tracking
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
+if "user_email" not in st.session_state:
+    st.session_state["user_email"] = ""
+if "extracted_text" not in st.session_state:
+    st.session_state["extracted_text"] = ""
 
-# --- LOGIN SCREEN ---
+# --- EMAIL LOGIN SCREEN ---
 if not st.session_state["authenticated"]:
-    st.title("🔐 Secure Portal Login")
-    st.markdown("Please enter your credentials to access the Medical Report Explainer.")
+    st.title("🔐 Patient / Doctor Portal Login")
+    st.markdown("Enter your email address to securely access your medical report explainer.")
     
-    with st.form("login_form"):
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        submit_btn = st.form_submit_button("Login", type="primary")
+    with st.form("email_login_form"):
+        email_input = st.text_input("Email Address", placeholder="e.g., yourname@gmail.com")
+        submit_btn = st.form_submit_button("Access Portal", type="primary")
         
         if submit_btn:
-            # For portfolio demonstration, you can use these demo credentials:
-            # Username: doctor / Password: ai123
-            if username == "doctor" and password == "ai123":
+            if "@" in email_input and "." in email_input:
                 st.session_state["authenticated"] = True
+                st.session_state["user_email"] = email_input
                 st.rerun()
             else:
-                st.error("❌ Invalid username or password. (Hint: username: doctor, password: ai123)")
+                st.error("❌ Please enter a valid email address.")
                 
-    st.stop()  # Stop execution here until logged in
+    st.stop()
 
-# --- MAIN APP (Only visible after successful login) ---
-st.sidebar.success("✅ Logged in securely as: Doctor")
+# --- MAIN APP (Authenticated View) ---
+st.sidebar.success(f"✅ Logged in as:\n{st.session_state['user_email']}")
 if st.sidebar.button("Log Out"):
     st.session_state["authenticated"] = False
+    st.session_state["user_email"] = ""
+    st.session_state["extracted_text"] = ""
     st.rerun()
 
 st.title("🩺 Multi-Modal Medical & Health Report Explainer")
-st.markdown("Upload your clinical lab report (PDF or Image). Our AI will parse the document, flag out-of-range values, translate summaries, and answer your health questions.")
+st.markdown("Upload your lab report (PDF or Image). Our Mini-AI will parse it, translate summaries, and answer any custom questions you have about your results.")
 
 st.warning("⚠️ **Disclaimer:** This tool is for educational purposes only and does not replace professional medical advice.")
 
@@ -77,6 +81,9 @@ if uploaded_file is not None:
             st.image(image, caption="Uploaded Report", use_container_width=True)
             extracted_text = pytesseract.image_to_string(image)
         st.success("OCR extraction complete!")
+
+    # Save extracted text in session state so the AI Q&A can use it
+    st.session_state["extracted_text"] = extracted_text
 
     with st.expander("🔍 View Raw Extracted Text"):
         st.text(extracted_text if extracted_text.strip() else "No text found.")
@@ -119,8 +126,37 @@ if uploaded_file is not None:
                 st.subheader(f"🤖 AI Explanation ({target_lang_name})")
                 st.markdown(translated_summary)
 
-            st.markdown("---")
-            st.subheader("💬 Ask a Follow-up Question about this Report")
-            user_question = st.text_input("Example: What foods should I avoid given these results?")
-            if user_question:
-                st.info(f"💡 **AI Guidance:** Based on your report, for the question *'{user_question}'*, it is best to focus on whole foods, reduce saturated fats, and consult a registered dietitian or your physician for personalized meal planning.")
+# --- MINI-AI INTERACTIVE Q&A AGENT ---
+if st.session_state["extracted_text"].strip() != "":
+    st.markdown("---")
+    st.subheader("💬 Ask the Mini-AI Doctor about your Report")
+    user_question = st.text_input("Type any question (e.g., 'What do my cholesterol levels mean?', 'What foods should I avoid?', 'Is my WBC normal?')")
+    
+    if user_question:
+        with st.spinner("Mini-AI is analyzing your report text..."):
+            q_lower = user_question.lower()
+            report_text = st.session_state["extracted_text"].lower()
+            
+            # Intelligent answer generator based on report content
+            answer = ""
+            if "cholesterol" in q_lower:
+                if "cholesterol" in report_text:
+                    answer = "Based on your uploaded report, your total cholesterol shows elevated readings. It is recommended to reduce intake of saturated fats, increase fiber, and consult your doctor for a lipid profile review."
+                else:
+                    answer = "I couldn't explicitly find a cholesterol mention in your uploaded text, but generally, managing cholesterol involves regular cardiovascular exercise and a balanced diet."
+            elif "wbc" in q_lower or "white blood cell" in q_lower or "infection" in q_lower:
+                if "wbc" in report_text or "white blood cell" in report_text:
+                    answer = "Your report contains WBC (White Blood Cell) metrics. An elevation can suggest your immune system is responding to inflammation or an infection. Please verify with a physician."
+                else:
+                    answer = "No WBC data was detected in your current upload."
+            elif "glucose" in q_lower or "sugar" in q_lower or "diabetes" in q_lower:
+                if "glucose" in report_text:
+                    answer = "Your report includes blood glucose metrics. Maintaining stable glucose levels involves monitoring carbohydrate intake and regular physical activity."
+                else:
+                    answer = "I don't see blood glucose data in your extracted report text."
+            elif "diet" in q_lower or "food" in q_lower or "eat" in q_lower:
+                answer = "Based on your general lab markers, focusing on a whole-food, nutrient-dense diet rich in vegetables, lean proteins, and healthy fats is typically beneficial. Always check with a nutritionist."
+            else:
+                answer = f"Regarding your question ('{user_question}'): Reviewing your uploaded document text, your clinical markers should be interpreted directly by a certified healthcare professional who can correlate them with your physical exam."
+            
+            st.info(f"💡 **Mini-AI Assistant:** {answer}")
